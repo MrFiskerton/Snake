@@ -8,12 +8,14 @@ SECTION .text
 %define BASE 0x7C00         ;Address at which BIOS will load MBR
 ;----------------------------------------------------------------------;
  [BITS 16]                          ;Enable 16-bit real mode
-;[ORG  BASE]                        ;This code start at this BASE memory address.
+ [ORG  BASE]                        ;This code start at this BASE memory address.
 ;-------------------Initialization-------------------------------------;
 Initialize:
     ;.segments:
-    mov     ax, 0x07C0 
-    mov     ds, ax                  ;set DS to the point where code is loaded
+    ;mov     ax, 0x07C0 
+    ;mov     ds, ax                  ;set DS to the point where code is loaded
+    xor     ax, ax
+    mov     ds, ax
     mov     ah, 0x01
     mov     cx, 0x2000
     int     0x10                    ;clear cursor blinking
@@ -31,7 +33,7 @@ game_loop:
     mov     ah, 0x01                ;Check if key available
     int     0x16
     jz      done_clear              ;if not, move on
-    mov     ah, 0x00                ;if the was a key, remove it from buffer
+    xor     ah, ah                  ;if the was a key, remove it from buffer
     int     0x16
     jmp     update_snakepos
 done_clear:
@@ -260,7 +262,7 @@ retry_msg db '! Press r', 0xA0      ; y
 hit_msg db 'You hit', 0xA0          ; space
 self_msg db 'yoursel', 0xE6         ; f
 wall_msg db 'the wal', 0xEC         ; l
-score_msg db 'Scor:', 0xA0          ; space
+score_msg db 'Score:', 0xA0         ; space
 rec_msg db 'Record:', 0xA0          ; space
 ;----------------------------------------------------------------------;
 
