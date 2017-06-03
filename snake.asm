@@ -1,103 +1,108 @@
 SECTION .data
-;message db "Hello", 0 ; db stands for 'define bytes'
-
+;message db "Hello", 0              ;db stands for 'define bytes'.
 SECTION .bss
 SECTION .text
 
-%define SIZE 512            ;MBR sector size (512 bytes)
-%define BASE 0x7C00         ;Address at which BIOS will load MBR
-;----------------------------------------------------------------------;
- [BITS 16]                          ;Enable 16-bit real mode
- [ORG  BASE]                        ;This code start at this BASE memory address.
-;-------------------Initialization-------------------------------------;
+;---------------------------------------------------------------------------------;
+%define SIZE 512                    ;MBR sector size (512 bytes).
+%define BASE 0x7C00                 ;Address at which BIOS will load game.
+;---------------------------------------------------------------------------------;
+[BITS 16]                           ;Enable 16-bit real mode.
+[ORG  BASE]                         ;This code start at this BASE memory address.
+;---------------------------------------------------------------------------------; 
+ 
+;-------------------Initialization------------------------------------------------;
 Initialize:
-    ;.segments:
-    ;mov     ax, 0x07C0 
-    ;mov     ds, ax                  ;set DS to the point where code is loaded
-    xor     ax, ax
-    mov     ds, ax
+    xor     ax, ax                  ;Set AX = 0. Need for set DS.
+    mov     ds, ax                  ;Set DS to the point where code is loaded.
     mov     ah, 0x01
     mov     cx, 0x2000
-    int     0x10                    ;clear cursor blinking
+    int     0x10                    ;Clear cursor blinking.
     mov     ax, 0x0305
     mov     bx, 0x031F
-    int     0x16                    ;increase delay before keybort repeat
+    int     0x16                    ;Increase delay before keybort repeat.
 
     ;cli                            ;Clear any interrupts (BIOS INT CALLS)
     ;hlt                            ;Halts the system
+;---------------------------------------------------------------------------------;    
 
-;------------------------Main------------------------------------------;
-game_loop:
-    call    clear_screen            ;Clear the screen
+;------------------------Main-----------------------------------------------------;
+Game_loop:
+    call    Clear_screen            ;Clear the screen
     push    word [snake_pos]        ;Save snake head position for later
+;---------------------------------------------------------------------------------; 
+
+;------------------------Handle input---------------------------------------------;  
+handle_input:                       ;---------------------------------------------;
     mov     ah, 0x01                ;Check if key available
     int     0x16
-    jz      done_clear              ;if not, move on
+    jz      .no_input               ;if not, move on
     xor     ah, ah                  ;if the was a key, remove it from buffer
     int     0x16
-    jmp     update_snakepos
-done_clear:
-    mov     al, [last_move]         ;No keys, so we use the last one
-;------------------------Switch movement-------------------------------;    
-update_snakepos:
+    jmp     .switch_direction
+.no_input:                          ;---------------------------------------------;
+    mov     al, [last_move]         ;No keys, so we use the last one        
+.switch_direction:                  ;---------------------------------------------;
     cmp     al, 'a'
-    je      left
+    je      .left
     cmp     al, 's'
-    je      down
+    je      .down
     cmp     al, 'd'
-    je      right
+    je      .right
     cmp     al, 'w'
-    jne     done_clear
-up:
+    jne     .no_input
+.up:                                ;---------------------------------------------;
     dec    byte [snake_y_pos]
-    jmp    move_done                ;jump away
-left:
+    jmp    .move_done               ;jump away
+.left:                              ;---------------------------------------------;
     dec    byte [snake_x_pos]
-    jmp    move_done                ;jump away
-right:
+    jmp    .move_done               ;jump away
+.right:                             ;---------------------------------------------;
     inc    byte [snake_x_pos]
-    jmp    move_done                ;jump away
-down:
+    jmp    .move_done               ;jump away
+.down:                              ;---------------------------------------------;
     inc    byte [snake_y_pos]
-move_done:
+.move_done:                         ;---------------------------------------------;
     mov    [last_move], al          ; save the direction
     mov    si, snake_body_pos       ; prepare body shift
     pop    ax                       ; restore read position into ax for body shift
-;----------------------Update body-------------------------------------;
+;---------------------------------------------------------------------------------;    
+    
+;----------------------Update body------------------------------------------------;
 update_body:
     mov    bx, [si]                 ; get element of body into bx
     test   bx, bx                   ; check if zero (not a part of the body)
-    jz     done_update              ; if zero, done. Otherwise
+    jz     .done_update             ; if zero, done. Otherwise
     mov    [si], ax                 ; move the data from ax, into current position
     add    si, 2                    ; increment pointer by two bytes
     mov    ax, bx                   ; save bx into ax for next loop
     jmp    update_body              ; loop
-done_update:
+.done_update:                       ;---------------------------------------------;
     cmp    byte [grow_snake_flag], 1; snake should grow?
-    jne    add_zero_snake           ; if not: jump to add_zero_snake
+    jne    .add_snake_body_end      ; if not: jump to .add_snake_body_end
     mov    word [si], ax            ; save the last element at the next position
     mov    byte [grow_snake_flag], 0; disable grow_snake_flag
     add    si, 2                    ; increment si by 2
-add_zero_snake:
+.add_snake_body_end:                ;---------------------------------------------;
     mov    word [si], 0x0000
-;----------------------------------------------------------------------;    
+;---------------------------------------------------------------------------------;    
 print_stuff:
     xor     dx, dx                  ; set pos to 0x0000
-    call    move_cursor             ; move cursor
+    call    Move_cursor             ; move cursor
     mov     si, score_msg           ; prepare to print score string
-    call    print_string            ; print it
+    call    Print_string            ; print it
     mov     ax, [score]             ; move the score into ax
-    call    print_int               ; print it
+    call    Print_int               ; print it
     
     mov dx, 0x0100
-    call    move_cursor
+    call    Move_cursor
     mov     si, rec_msg             ; prepare to print record string
-    call    print_string  
-    mov     ax, [record]               ; move the record into ax
-    call    print_int 
+    call    Print_string  
+    mov     ax, [record]            ; move the record into ax
+    call    Print_int 
         
     mov     dx, [food_pos]          ; set dx to the food position
-    call    move_cursor             ; move cursor there
+    call    Move_cursor             ; move cursor there
     
     
     mov     ax, 0600h               ;color food in red
@@ -106,11 +111,11 @@ print_stuff:
     int     0x10
     
     mov     al, '*'                 ; use '*' as food symbol
-    call    print_char              ; print food
+    call    Print_char              ; print food
     mov     dx, [snake_pos]         ; set dx to the snake head position
-    call    move_cursor             ; move there    
+    call    Move_cursor             ; move there    
     mov     al, '@'                 ; use '@' as snake head symbol
-    call    print_char              ; print it
+    call    Print_char              ; print it
     mov     si, snake_body_pos      ; prepare to print snake body
     
 snake_body_print_loop:
@@ -118,26 +123,26 @@ snake_body_print_loop:
     test    ax, ax                  ; check if position is zero
     jz      check_collisions        ; if it was zero, move out of here
     mov     dx, ax                  ; if not, move the position into dx
-    call    move_cursor             ; move the cursor there
+    call    Move_cursor             ; move the cursor there
     mov     al, 'o'                 ; use 'o' as the snake body symbol
-    call    print_char              ; print it
+    call    Print_char              ; print it
     jmp     snake_body_print_loop   ; loop
 
 check_collisions:
     mov    bx, [snake_pos]          ; move the snake head position into bx
-    cmp    bh, 25                   ; check if we are too far down
-    jge    game_over_hit_wall       ; if yes, jump
-    cmp    bh, 0                    ; check if we are too far up
-    jl     game_over_hit_wall       ; if yes, jump
-    cmp    bl, 80                   ; check if we are too far to the right
-    jge    game_over_hit_wall       ; if yes, jump
-    cmp    bl, 0                    ; check if we are too far to the left
-    jl     game_over_hit_wall       ; if yes, jump
+    cmp    bh, 25                   ; check if we are too far .down
+    jge    Game_over_hit_wall       ; if yes, jump
+    cmp    bh, 0                    ; check if we are too far .up
+    jl     Game_over_hit_wall       ; if yes, jump
+    cmp    bl, 80                   ; check if we are too far to the .right
+    jge    Game_over_hit_wall       ; if yes, jump
+    cmp    bl, 0                    ; check if we are too far to the .left
+    jl     Game_over_hit_wall       ; if yes, jump
     mov    si, snake_body_pos       ; prepare to check for self-collision
 check_collisions_self:
     lodsw                           ; load position of snake body, and increment si
     cmp    ax, bx                   ; check if head position = body position
-    je     game_over_hit_self       ; if it is, jump
+    je     Game_over_hit_self       ; if it is, jump
     or     ax, ax                   ; check if position is 0x0000 (we are done searching)
     jne    check_collisions_self    ; if not, loop
 
@@ -147,10 +152,10 @@ no_collision:
     jne    game_loop_continued      ; jump if snake didn't hit food
     inc    word [score]             ; if we were on food, increment score
     mov    bx, 24                   ; set max value for random call (y-val - 1)
-    call   rand                     ; generate random value
+    call   Random                     ; generate random value
     push   dx                       ; save it on the stack
     mov    bx, 78                   ; set max value for random call
-    call   rand                     ; generate random value
+    call   Random                     ; generate random value
     pop    cx                       ; restore old random into cx
     mov    dh, cl                   ; move old value into high bits of new
     mov    [food_pos], dx           ; save the position of the new random food
@@ -159,94 +164,98 @@ no_collision:
     cmp    ax, [record]
     jng    game_loop_continued
     inc    word [record]  
+;---------------------------------------------------------------------------------;    
 game_loop_continued:
     mov    cx, 0x0002               ; Sleep for 0,15 seconds (cx:dx)
     mov    dx, 0x49F0               ; 0x000249F0 = 150000
     mov    ah, 0x86
     int    0x15                     ; Sleep
-    jmp    game_loop                ; loop
+    jmp    Game_loop                ; loop
+;---------------------------------------------------------------------------------;
 
-game_over_hit_self:
+;-----------------Game over-------------------------------------------------------;
+Game_over_hit_self:
     push   self_msg
     jmp    game_over
 
-game_over_hit_wall:
+Game_over_hit_wall:
     push   wall_msg
 
-game_over:                          ; you lose
-    call   clear_screen             ; clear field
+game_over:                          ;---------------------------------------------;
+    call   Clear_screen             ; clear field
     mov    dx, 0x0B17               ; display text in the center (12, 23)
-    call   move_cursor              ; move cursor to start of string
+    call   Move_cursor              ; move cursor to start of string
     mov    si, hit_msg              
-    call   print_string
+    call   Print_string
     pop    si
-    call   print_string
+    call   Print_string
     mov    si, retry_msg
-    call   print_string
-wait_for_r:                         ; wait for restart
-    ;mov    ah, 0x00                ; get pressed symbol
-    xor    ah, ah
+    call   Print_string
+.wait_for_restart:                  ;---------------------------------------------;
+    xor    ah, ah                   ; get pressed symbol
     int    0x16
     cmp    al, 'r'                  ; if r - start new game, otherwise wait
-    jne    wait_for_r               ;
+    jne    .wait_for_restart        ;
     mov    word [snake_pos], 0x0B28 ; restore default values
     and    word [snake_body_pos], 0
     and    word [score], 0
-    jmp    game_loop                ; continue game
-
-;-------------------Screen functions-----------------------------------;
-clear_screen:
+    jmp    Game_loop                ; continue game
+;---------------------------------------------------------------------------------;
+    
+;-------------------Screen functions----------------------------------------------;
+Clear_screen:
     mov    ax, 0x0700               ; clear entire window (ah 0x07, al 0x00)
     mov    bh, 0x02                 ; green on black
-    xor    cx, cx                   ; top left = (0,0)
-    mov    dx, 0x1950               ; bottom right = (25, 80)
+    xor    cx, cx                   ; top .left = (0,0)
+    mov    dx, 0x1950               ; bottom .right = (25, 80)
     int    0x10                     ; interrupt 10h
     xor    dx, dx                   ; set dx to 0x0000
-    call   move_cursor              ; move cursor
+    call   Move_cursor              ; move cursor
     ret
-
-move_cursor:
+;---------------------------------------------------------------------------------;
+Move_cursor:
     mov    ah, 0x02                 ; move to (dl, dh)
     xor    bh, bh                   ; page 0    
     int    0x10                     ; interrupt 10h 
     ret
-
-;-------------------Print----------------------------------------------;
-print_string_loop:
-    call   print_char
-print_string:                       ; print the string pointed to in si    
+;---------------------------------------------------------------------------------;
+    
+;-------------------Print---------------------------------------------------------;
+print_string_loop:                  ;---------------------------------------------;
+    call   Print_char
+Print_string:                       ; print the string pointed to in si    
     lodsb                           ; load next byte from si
     test   al, al                   ; check if high bit is set (end of string)
     jns    print_string_loop        ; loop if high bit was not set
-
-print_char:                         ; print the char at al
+;---------------------------------------------------------------------------------;
+Print_char:                         ; print the char at al
     and    al, 0x7F                 ; unset the high bit
     mov    ah, 0x0E
     int    0x10                     ; interrupt 10h
     ret
-
-print_int:                          ; print the int in ax
+;---------------------------------------------------------------------------------;
+Print_int:                          ; print the int in ax
     push   bp                       ; save bp on the stack
     mov    bp, sp                   ; set bp = stack pointer
-
-push_digits:
+    .push_digits:                   ;---------------------------------------------;
     xor    dx, dx                   ; clear dx for division
     mov    bx, 10                   ; set bx to 10
     div    bx                       ; divide by 10
     push   dx                       ; store remainder on stack
     test   ax, ax                   ; check if quotient is 0
-    jnz    push_digits              ; if not, loop
-
-pop_and_print_digits:
-    pop    ax                       ; get first digit from stack
+    jnz    .push_digits             ; if not, loop
+    .pop_and_print_digits:          ;---------------------------------------------;
+    pop    ax                       ; get first digit from stackw
     add    al, '0'                  ; turn it into ascii digits
-    call   print_char               ; print it
+    call   Print_char               ; print it
     cmp    sp, bp                   ; is the stack pointer is at where we began?
-    jne    pop_and_print_digits     ; if not, loop
+    jne    .pop_and_print_digits    ; if not, loop
     pop    bp                       ; if yes, restore bp
-    ret    
-;-------------------Utility functions----------------------------------;
-rand:                               ; random number between 1 and bx. result in dx
+    ret
+;---------------------------------------------------------------------------------;    
+    
+;-------------------Utility functions---------------------------------------------;
+Random:                             ; random number between 1 and bx. result in dx
     mov    ah, 0x00
     int    0x1A                     ; get clock ticks since midnight
     mov    ax, dx                   ; move lower bits into ax for division
@@ -254,40 +263,19 @@ rand:                               ; random number between 1 and bx. result in 
     div    bx                       ; divide ax by bx to get remainder in dx
     inc    dx                       ; not zero
     ret
+;---------------------------------------------------------------------------------;
     
-;----------------Messages---------------------------------------------;    
+;--------------------Messages-----------------------------------------------------;    
 ;(Encoded as 7-bit strings.) Last byte is an ascii value with its high bit set. 
+hit_msg     db 'You hit', 0xA0      ; space
+self_msg    db 'yoursel', 0xE6      ; f
+wall_msg    db 'the wal', 0xEC      ; l
+retry_msg   db '! Press r', 0xA0    ; space
+score_msg   db 'Score:',  0xA0      ; space
+rec_msg     db 'Record:', 0xA0      ; space
+;---------------------------------------------------------------------------------;
 
-retry_msg db '! Press r', 0xA0      ; y
-hit_msg db 'You hit', 0xA0          ; space
-self_msg db 'yoursel', 0xE6         ; f
-wall_msg db 'the wal', 0xEC         ; l
-score_msg db 'Score:', 0xA0         ; space
-rec_msg db 'Record:', 0xA0          ; space
-;----------------------------------------------------------------------;
-
-;======== Print String =========;
-;In: 
-;     si: string with 0-end
-;     bh: page (text mode only)
-;     bl: color (graphics mode)
-;Change: 
-;     si, ax, bh -> set to 0x00
-;Out: (void)
-;===============================;
-;Print_string:
-    ;mov ah, 0x0E                ;0Eh -> Write Character in TTY Mode.
-    ;.print_char:
-        ;lodsb                   ;This loads a byte from [DS:SI] into AL.
-        ;cmp     al, 0           ;This compares a "Character" with 0.
-        ;je      .print_done     ;Return if string is printed.
-        ;int     0x10            ;This call interrupt.
-        ;jmp     .print_char     ;Go back to print_char and repeat until the rest of the characters are done with it.
-;    .print_done: ret            ;Return.
-
-;----------------------------------------------------------------------;  
-
-;-------------------Variables------------------------------------------;
+;--------------------Variables----------------------------------------------------;
 grow_snake_flag db 0
 score dw 0
 record dw 0
@@ -297,8 +285,9 @@ snake_pos:
     snake_y_pos db 0x0F
 food_pos dw 0x0D0D    
 snake_body_pos dw 0x0000
-;----------------------------------------------------------------------;
-;message db "Hello, World!", 0           ; db stands for 'define bytes'
-;--------------------Padding and boot singnature-----------------------;
+;---------------------------------------------------------------------------------;
+
+;--------------------Padding and boot singnature----------------------------------;
 times 510 - ($ - $$) db 0     ;Fill the rest of the code with 0, this will fill untill the code is 510 bytes.
 dw 0xAA55                     ;This is a boot signature (2 bytes).
+;---------------------------------------------------------------------------------;
